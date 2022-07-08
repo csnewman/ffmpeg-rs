@@ -1,6 +1,6 @@
 use crate::sys::{
-    avio_closep, avio_open, AVIOContext, AVIO_FLAG_DIRECT, AVIO_FLAG_NONBLOCK, AVIO_FLAG_READ,
-    AVIO_FLAG_WRITE,
+    avio_close, avio_closep, avio_flush, avio_open, avio_open_dyn_buf, AVIOContext,
+    AVIO_FLAG_DIRECT, AVIO_FLAG_NONBLOCK, AVIO_FLAG_READ, AVIO_FLAG_WRITE,
 };
 use crate::util::map_to_cstr;
 use crate::{wrap_error, AvError};
@@ -35,6 +35,31 @@ impl AvIoContext {
         }
     }
 
+    pub fn open_dyn_buf(&mut self) -> Result<(), AvError> {
+        unsafe {
+            let ptr = self.ptr as *mut *mut AVIOContext;
+
+            let result = avio_open_dyn_buf(ptr);
+
+            match result {
+                0 => Ok(()),
+                val => Err(wrap_error(val)),
+            }
+        }
+    }
+
+    pub fn close(&mut self) -> Result<(), AvError> {
+        unsafe {
+            let ptr = *self.ptr;
+            let result = avio_close(ptr);
+
+            match result {
+                0 => Ok(()),
+                val => Err(wrap_error(val)),
+            }
+        }
+    }
+
     pub fn closep(&mut self) -> Result<(), AvError> {
         unsafe {
             let ptr = self.ptr as *mut *mut AVIOContext;
@@ -44,6 +69,13 @@ impl AvIoContext {
                 0 => Ok(()),
                 val => Err(wrap_error(val)),
             }
+        }
+    }
+
+    pub fn flush(&mut self) {
+        unsafe {
+            let ptr = *self.ptr;
+            avio_flush(ptr);
         }
     }
 }

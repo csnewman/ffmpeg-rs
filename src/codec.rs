@@ -32,6 +32,16 @@ impl AvCodecParameters {
         unsafe { (*self.params).codec_id }
     }
 
+    pub fn codec_tag(&self) -> u32 {
+        unsafe { (*self.params).codec_tag }
+    }
+
+    pub fn set_codec_tag(&mut self, value: u32) {
+        unsafe {
+            (*self.params).codec_tag = value;
+        }
+    }
+
     pub fn width(&self) -> c_int {
         unsafe { (*self.params).width }
     }

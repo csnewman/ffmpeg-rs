@@ -1,11 +1,12 @@
 use crate::context::{ContextType, InputContext, OutputContext};
+use crate::dict::AvDictionary;
 use crate::io::AvIoContext;
 use crate::packet::AvPacket;
 use crate::stream::AvStream;
 use crate::sys::{
-    av_interleaved_write_frame, av_read_frame, av_write_trailer, avformat_find_stream_info,
-    avformat_new_stream, avformat_open_input, avformat_write_header, AVFormatContext,
-    AVIOContext,
+    av_guess_format, av_interleaved_write_frame, av_read_frame, av_write_frame, av_write_trailer,
+    avformat_find_stream_info, avformat_init_output, avformat_new_stream, avformat_open_input,
+    avformat_write_header, AVFormatContext, AVIOContext, AVOutputFormat,
 };
 use crate::util::{cstr_optional_to_ptr, map_to_cstr_optional};
 use crate::{avformat_alloc_output_context2, wrap_error, AvBorrow, AvBorrowMut, AvError};
@@ -71,18 +72,22 @@ impl<T: ContextType> Drop for AvFormatContext<T> {
 
 impl AvFormatContext<OutputContext> {
     pub fn alloc_output(
-        oformat: Option<AvOutputFormat>,
+        oformat: Option<&AvOutputFormat>,
         format_name: Option<&str>,
         filename: Option<&str>,
     ) -> Result<Self, AvError> {
         unsafe {
             let mut ctx = ptr::null_mut();
+            let oformat = match oformat {
+                None => ptr::null(),
+                Some(value) => value.ptr,
+            };
             let format_name = map_to_cstr_optional(format_name);
             let filename = map_to_cstr_optional(filename);
 
             let result = avformat_alloc_output_context2(
                 &mut ctx,
-                ptr::null(),
+                oformat,
                 cstr_optional_to_ptr(&format_name),
                 cstr_optional_to_ptr(&filename),
             );
@@ -93,6 +98,22 @@ impl AvFormatContext<OutputContext> {
                     _type: Default::default(),
                 }),
                 val => Err(wrap_error(val)),
+            }
+        }
+    }
+
+    pub fn init_output(&mut self, options: Option<&mut AvDictionary>) -> Result<(), AvError> {
+        unsafe {
+            let options = match options {
+                None => ptr::null_mut(),
+                Some(value) => &mut value.ptr,
+            };
+            let result = avformat_init_output(self.ptr, options);
+
+            if result.is_negative() {
+                Err(wrap_error(result))
+            } else {
+                Ok(())
             }
         }
     }
@@ -116,6 +137,23 @@ impl AvFormatContext<OutputContext> {
             match result {
                 0 => Ok(()),
                 val => Err(wrap_error(val)),
+            }
+        }
+    }
+
+    pub fn write_frame(&self, packet: Option<&AvPacket>) -> Result<(), AvError> {
+        unsafe {
+            let packet = match packet {
+                None => ptr::null_mut(),
+                Some(value) => value.ptr,
+            };
+
+            let result = av_write_frame(self.ptr, packet);
+
+            if result.is_negative() {
+                Err(wrap_error(result))
+            } else {
+                Ok(())
             }
         }
     }
@@ -176,4 +214,32 @@ impl<T: ContextType> AvFormatContext<T> {
     }
 }
 
-pub struct AvOutputFormat {}
+pub struct AvOutputFormat {
+    ptr: *const AVOutputFormat,
+}
+
+impl AvOutputFormat {
+    pub fn guess_format(
+        short_name: Option<&str>,
+        filename: Option<&str>,
+        mime_type: Option<&str>,
+    ) -> Option<Self> {
+        unsafe {
+            let short_name = map_to_cstr_optional(short_name);
+            let filename = map_to_cstr_optional(filename);
+            let mime_type = map_to_cstr_optional(mime_type);
+
+            let format = av_guess_format(
+                cstr_optional_to_ptr(&short_name),
+                cstr_optional_to_ptr(&filename),
+                cstr_optional_to_ptr(&mime_type),
+            );
+
+            if format.is_null() {
+                None
+            } else {
+                Some(Self { ptr: format })
+            }
+        }
+    }
+}
