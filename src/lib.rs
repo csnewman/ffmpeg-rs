@@ -5,6 +5,7 @@ use std::os::raw::c_int;
 
 pub mod codec;
 pub mod context;
+pub mod dict;
 pub mod format;
 pub mod frame;
 pub mod io;
@@ -21,6 +22,8 @@ pub enum AvError {
 }
 
 fn wrap_error(id: c_int) -> AvError {
+    println!("{}", id);
+
     AvError::Todo
 }
 
