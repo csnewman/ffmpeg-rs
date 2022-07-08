@@ -1,15 +1,66 @@
 use crate::context::{ContextType, DecodeContext, EncodeContext};
+pub use crate::sys::AVCodecID as AvCodecId;
+pub use crate::sys::AVPixelFormat as AvPixelFormat;
 use crate::sys::{
     avcodec_alloc_context3, avcodec_find_decoder, avcodec_find_encoder, avcodec_open2,
     avcodec_parameters_alloc, avcodec_parameters_copy, avcodec_parameters_free,
-    avcodec_parameters_to_context, AVCodec, AVCodecContext, AVCodecParameters,
+    avcodec_parameters_from_context, avcodec_parameters_to_context, AVCodec, AVCodecContext,
+    AVCodecParameters, AV_CODEC_FLAG_4MV, AV_CODEC_FLAG_AC_PRED, AV_CODEC_FLAG_BITEXACT,
+    AV_CODEC_FLAG_CLOSED_GOP, AV_CODEC_FLAG_DROPCHANGED, AV_CODEC_FLAG_GLOBAL_HEADER,
+    AV_CODEC_FLAG_GRAY, AV_CODEC_FLAG_INTERLACED_DCT, AV_CODEC_FLAG_INTERLACED_ME,
+    AV_CODEC_FLAG_LOOP_FILTER, AV_CODEC_FLAG_LOW_DELAY, AV_CODEC_FLAG_OUTPUT_CORRUPT,
+    AV_CODEC_FLAG_PASS1, AV_CODEC_FLAG_PASS2, AV_CODEC_FLAG_PSNR, AV_CODEC_FLAG_QPEL,
+    AV_CODEC_FLAG_QSCALE, AV_CODEC_FLAG_TRUNCATED, AV_CODEC_FLAG_UNALIGNED,
 };
+use crate::util::AvRational;
 use crate::{wrap_error, AvError, AvMediaType, AvOwnable, AvOwned};
+use bitflags::bitflags;
+use paste::paste;
 use std::marker::PhantomData;
-use std::os::raw::c_int;
+use std::os::raw::{c_int, c_uint};
 use std::ptr;
 
-pub use crate::sys::AVCodecID as AvCodecId;
+bitflags! {
+    pub struct CodecFlags: u32 {
+        const UNALIGNED = AV_CODEC_FLAG_UNALIGNED;
+        const QSCALE = AV_CODEC_FLAG_QSCALE;
+        const _4MV = AV_CODEC_FLAG_4MV;
+        const OUTPUT_CORRUPT = AV_CODEC_FLAG_OUTPUT_CORRUPT;
+        const QPEL = AV_CODEC_FLAG_QPEL;
+        const DROP_CHANGED = AV_CODEC_FLAG_DROPCHANGED;
+        const PASS1 = AV_CODEC_FLAG_PASS1;
+        const PASS2 = AV_CODEC_FLAG_PASS2;
+        const LOOP_FILTER = AV_CODEC_FLAG_LOOP_FILTER;
+        const GRAY = AV_CODEC_FLAG_GRAY;
+        const PSNR = AV_CODEC_FLAG_PSNR;
+        const TRUNCATED = AV_CODEC_FLAG_TRUNCATED;
+        const INTERLACED_DCT = AV_CODEC_FLAG_INTERLACED_DCT;
+        const LOW_DELAY = AV_CODEC_FLAG_LOW_DELAY;
+        const GLOBAL_HEADER = AV_CODEC_FLAG_GLOBAL_HEADER;
+        const BIT_EXACT = AV_CODEC_FLAG_BITEXACT;
+        const AC_PRED = AV_CODEC_FLAG_AC_PRED;
+        const INTERLACED_ME = AV_CODEC_FLAG_INTERLACED_ME;
+        const CLOSED_GOP = AV_CODEC_FLAG_CLOSED_GOP;
+    }
+}
+
+macro_rules! property {
+    ($name:ident, $ret:ty) => {
+        paste! {
+            pub fn $name(&self) -> $ret {
+                unsafe {
+                    (*self.ptr).$name
+                }
+            }
+
+            pub fn [<set_ $name>](&mut self, value: $ret) {
+                unsafe {
+                    (*self.ptr).$name = value;
+                }
+            }
+        }
+    };
+}
 
 pub struct AvCodecParameters {
     pub(crate) params: *mut AVCodecParameters,
@@ -64,6 +115,20 @@ impl AvCodecParameters {
             }
         }
     }
+
+    pub fn copy_from_context<T: ContextType>(
+        &mut self,
+        src: &AvCodecContext<T>,
+    ) -> Result<(), AvError> {
+        unsafe {
+            let result = avcodec_parameters_from_context(self.params, src.ptr);
+
+            match result {
+                0 => Ok(()),
+                val => Err(wrap_error(val)),
+            }
+        }
+    }
 }
 
 impl AvOwnable for AvCodecParameters {
@@ -110,13 +175,36 @@ impl AvCodec<EncodeContext> {
     }
 }
 
+impl<T> AvCodec<T> {
+    pub fn pix_fmts(&self) -> Vec<AvPixelFormat> {
+        unsafe {
+            let mut ptr: *const AvPixelFormat = (*self.codec).pix_fmts;
+            let mut values = Vec::new();
+
+            if !ptr.is_null() {
+                loop {
+                    let value = *ptr;
+                    if value == AvPixelFormat::None {
+                        break;
+                    }
+
+                    values.push(value);
+                    ptr = ptr.offset(1);
+                }
+            }
+
+            values
+        }
+    }
+}
+
 pub struct AvCodecContext<T: ContextType> {
     ptr: *mut AVCodecContext,
     _type: PhantomData<T>,
 }
 
 impl<T: ContextType> AvCodecContext<T> {
-    pub fn alloc(codec: Option<AvCodec<T>>) -> Option<Self> {
+    pub fn alloc(codec: Option<&AvCodec<T>>) -> Option<Self> {
         unsafe {
             let codec = match codec {
                 None => ptr::null(),
@@ -146,7 +234,7 @@ impl<T: ContextType> AvCodecContext<T> {
         }
     }
 
-    pub fn open(&mut self, codec: Option<AvCodec<T>>) -> Result<(), AvError> {
+    pub fn open(&mut self, codec: Option<&AvCodec<T>>) -> Result<(), AvError> {
         unsafe {
             let codec = match codec {
                 None => ptr::null(),
@@ -161,13 +249,9 @@ impl<T: ContextType> AvCodecContext<T> {
         }
     }
 
-    pub fn codec_type(&self) -> AvMediaType {
-        unsafe { (*self.ptr).codec_type }
-    }
-
-    pub fn codec_id(&self) -> AvCodecId {
-        unsafe { (*self.ptr).codec_id }
-    }
+    property!(codec_type, AvMediaType);
+    property!(codec_id, AvCodecId);
+    property!(codec_tag, c_uint);
 
     pub fn codec(&self) -> AvCodec<T> {
         unsafe {
@@ -176,6 +260,54 @@ impl<T: ContextType> AvCodecContext<T> {
                 codec,
                 _ctx: Default::default(),
             }
+        }
+    }
+
+    property!(bit_rate, i64);
+
+    pub fn time_base(&self) -> AvRational {
+        unsafe { AvRational::from((*self.ptr).time_base) }
+    }
+
+    pub fn set_time_base(&mut self, value: AvRational) {
+        unsafe {
+            (*self.ptr).flags = 1;
+            (*self.ptr).time_base = value.into();
+        }
+    }
+
+    property!(width, c_int);
+    property!(height, c_int);
+
+    pub fn sample_aspect_ratio(&self) -> AvRational {
+        unsafe { AvRational::from((*self.ptr).sample_aspect_ratio) }
+    }
+
+    pub fn set_sample_aspect_ratio(&mut self, value: AvRational) {
+        unsafe {
+            (*self.ptr).sample_aspect_ratio = value.into();
+        }
+    }
+
+    property!(pix_fmt, AvPixelFormat);
+
+    pub fn framerate(&self) -> AvRational {
+        unsafe { AvRational::from((*self.ptr).framerate) }
+    }
+
+    pub fn set_framerate(&mut self, value: AvRational) {
+        unsafe {
+            (*self.ptr).framerate = value.into();
+        }
+    }
+
+    pub fn flags(&self) -> CodecFlags {
+        unsafe { CodecFlags::from_bits_unchecked((*self.ptr).flags as u32) }
+    }
+
+    pub fn set_flags(&mut self, value: CodecFlags) {
+        unsafe {
+            (*self.ptr).flags = value.bits as c_int;
         }
     }
 }

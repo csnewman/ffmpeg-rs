@@ -21,6 +21,15 @@ pub struct AvRational {
     pub den: c_int,
 }
 
+impl AvRational {
+    pub fn inverse(&self) -> Self {
+        Self {
+            num: self.den,
+            den: self.num,
+        }
+    }
+}
+
 impl From<AVRational> for AvRational {
     fn from(value: AVRational) -> Self {
         Self {

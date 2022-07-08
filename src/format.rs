@@ -6,11 +6,16 @@ use crate::stream::AvStream;
 use crate::sys::{
     av_guess_format, av_interleaved_write_frame, av_read_frame, av_write_frame, av_write_trailer,
     avformat_find_stream_info, avformat_init_output, avformat_new_stream, avformat_open_input,
-    avformat_write_header, AVFormatContext, AVIOContext, AVOutputFormat,
+    avformat_write_header, AVFormatContext, AVIOContext, AVOutputFormat, AVFMT_ALLOW_FLUSH,
+    AVFMT_GLOBALHEADER, AVFMT_NEEDNUMBER, AVFMT_NODIMENSIONS, AVFMT_NOFILE, AVFMT_NOSTREAMS,
+    AVFMT_NOTIMESTAMPS, AVFMT_TS_NEGATIVE, AVFMT_TS_NONSTRICT, AVFMT_VARIABLE_FPS,
 };
 use crate::util::{cstr_optional_to_ptr, map_to_cstr_optional};
 use crate::{avformat_alloc_output_context2, wrap_error, AvBorrow, AvBorrowMut, AvError};
+use bitflags::bitflags;
 use std::marker::PhantomData;
+use std::os::raw::c_int;
+use std::process::Output;
 use std::ptr;
 
 pub struct AvFormatContext<T: ContextType> {
@@ -182,7 +187,7 @@ impl<T: ContextType> AvFormatContext<T> {
             }
 
             let stream = *(*self.ptr).streams.add(id);
-            Some(AvBorrow::wrap(&self, AvStream::wrap(stream)))
+            Some(AvBorrow::wrap(&self, AvStream::wrap(self.ptr, stream)))
         }
     }
 
@@ -192,7 +197,7 @@ impl<T: ContextType> AvFormatContext<T> {
             if stream.is_null() {
                 None
             } else {
-                Some(AvStream::wrap(stream))
+                Some(AvStream::wrap(self.ptr, stream))
             }
         }
     }
@@ -211,6 +216,21 @@ impl<T: ContextType> AvFormatContext<T> {
 
             AvBorrowMut::wrap(self, AvIoContext { ptr })
         }
+    }
+}
+
+bitflags! {
+    pub struct OutputFlags: u32 {
+        const NO_FILE = AVFMT_NOFILE;
+        const NEED_NUMBER = AVFMT_NEEDNUMBER;
+        const GLOBAL_HEADER = AVFMT_GLOBALHEADER;
+        const NO_TIMESTAMPS = AVFMT_NOTIMESTAMPS;
+        const VARIABLE_FPS = AVFMT_VARIABLE_FPS;
+        const NO_DIMENSIONS = AVFMT_NODIMENSIONS;
+        const NO_STREAMS = AVFMT_NOSTREAMS;
+        const ALLOW_FLUSH = AVFMT_ALLOW_FLUSH;
+        const TS_NON_STRICT = AVFMT_TS_NONSTRICT;
+        const TS_NEGATIVE = AVFMT_TS_NEGATIVE;
     }
 }
 
@@ -241,5 +261,9 @@ impl AvOutputFormat {
                 Some(Self { ptr: format })
             }
         }
+    }
+
+    pub fn flags(&self) -> OutputFlags {
+        unsafe { OutputFlags::from_bits_unchecked((*self.ptr).flags as u32) }
     }
 }

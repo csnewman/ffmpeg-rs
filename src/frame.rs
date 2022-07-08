@@ -1,7 +1,7 @@
 use crate::sys::{av_frame_alloc, av_frame_free, AVFrame};
 
 pub struct AvFrame {
-    ptr: *mut AVFrame,
+    pub(crate) ptr: *mut AVFrame,
 }
 
 impl AvFrame {

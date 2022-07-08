@@ -1,6 +1,8 @@
 use bindgen::callbacks::{EnumVariantValue, MacroParsingBehavior, ParseCallbacks};
 use convert_case::{Case, Casing};
 use flate2::read::GzDecoder;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
 use std::fs::File;
@@ -60,6 +62,14 @@ const ENABLED_HEADERS: &'static [&'static str] = &[
     "libavformat/avformat.h",
 ];
 
+lazy_static! {
+    static ref CUSTOM_PREFIX: HashMap<String, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert("AVPixelFormat".to_string(), "AVPIXFMT");
+        m
+    };
+}
+
 #[derive(Debug)]
 struct Callbacks;
 
@@ -89,7 +99,10 @@ impl ParseCallbacks for Callbacks {
             return None;
         };
 
-        let mut chars = enum_name.chars().peekable();
+        let mut chars = match CUSTOM_PREFIX.get(&enum_name) {
+            None => enum_name.chars().peekable(),
+            Some(value) => value.chars().peekable(),
+        };
         let mut new_name = String::new();
 
         let mut copying = false;

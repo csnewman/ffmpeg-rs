@@ -1,19 +1,23 @@
 use crate::codec::AvCodecParameters;
 use crate::context::ContextType;
 use crate::format::AvFormatContext;
-use crate::sys::AVStream;
+use crate::frame::AvFrame;
+use crate::sys::{av_guess_frame_rate, AVFormatContext, AVStream};
 use crate::util::AvRational;
 use crate::{AvBorrow, AvBorrowMut};
 use std::marker::PhantomData;
+use std::ptr;
 
 pub struct AvStream<T: ContextType> {
+    format: *mut AVFormatContext,
     stream: *mut AVStream,
-    _ctx: PhantomData<AvFormatContext<T>>,
+    _ctx: PhantomData<T>,
 }
 
 impl<T: ContextType> AvStream<T> {
-    pub fn wrap(stream: *mut AVStream) -> Self {
+    pub fn wrap(format: *mut AVFormatContext, stream: *mut AVStream) -> Self {
         Self {
+            format,
             stream,
             _ctx: Default::default(),
         }
@@ -38,6 +42,23 @@ impl<T: ContextType> AvStream<T> {
                     params: (*self.stream).codecpar,
                 },
             )
+        }
+    }
+
+    pub fn guess_frame_rate(&self, frame: Option<&AvFrame>) -> Option<AvRational> {
+        unsafe {
+            let frame = match frame {
+                None => ptr::null_mut(),
+                Some(value) => value.ptr,
+            };
+
+            let result = av_guess_frame_rate(self.format, self.stream, frame);
+
+            if result.num == 0 && result.den == 1 {
+                None
+            } else {
+                Some(result.into())
+            }
         }
     }
 
