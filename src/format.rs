@@ -6,16 +6,14 @@ use crate::stream::AvStream;
 use crate::sys::{
     av_guess_format, av_interleaved_write_frame, av_read_frame, av_write_frame, av_write_trailer,
     avformat_find_stream_info, avformat_init_output, avformat_new_stream, avformat_open_input,
-    avformat_write_header, AVFormatContext, AVIOContext, AVOutputFormat, AVFMT_ALLOW_FLUSH,
-    AVFMT_GLOBALHEADER, AVFMT_NEEDNUMBER, AVFMT_NODIMENSIONS, AVFMT_NOFILE, AVFMT_NOSTREAMS,
-    AVFMT_NOTIMESTAMPS, AVFMT_TS_NEGATIVE, AVFMT_TS_NONSTRICT, AVFMT_VARIABLE_FPS,
+    avformat_write_header, AVDictionary, AVFormatContext, AVIOContext, AVOutputFormat,
+    AVFMT_ALLOW_FLUSH, AVFMT_GLOBALHEADER, AVFMT_NEEDNUMBER, AVFMT_NODIMENSIONS, AVFMT_NOFILE,
+    AVFMT_NOSTREAMS, AVFMT_NOTIMESTAMPS, AVFMT_TS_NEGATIVE, AVFMT_TS_NONSTRICT, AVFMT_VARIABLE_FPS,
 };
 use crate::util::{cstr_optional_to_ptr, map_to_cstr_optional};
 use crate::{avformat_alloc_output_context2, wrap_error, AvBorrow, AvBorrowMut, AvError};
 use bitflags::bitflags;
 use std::marker::PhantomData;
-use std::os::raw::c_int;
-use std::process::Output;
 use std::ptr;
 
 pub struct AvFormatContext<T: ContextType> {
@@ -46,9 +44,19 @@ impl AvFormatContext<InputContext> {
         }
     }
 
-    pub fn find_stream_info(&self) -> Result<(), AvError> {
+    pub fn find_stream_info(&self, options: Option<&[&AvDictionary]>) -> Result<(), AvError> {
         unsafe {
-            let result = avformat_find_stream_info(self.ptr, ptr::null_mut());
+            let options: Option<Vec<*mut AVDictionary>> = match options {
+                None => None,
+                Some(value) => Some(value.iter().map(|d| d.ptr).collect()),
+            };
+
+            let options_ptr = match options.as_ref() {
+                None => ptr::null_mut(),
+                Some(value) => value.as_ptr() as *mut *mut AVDictionary,
+            };
+
+            let result = avformat_find_stream_info(self.ptr, options_ptr);
 
             match result {
                 0 => Ok(()),
@@ -188,6 +196,17 @@ impl<T: ContextType> AvFormatContext<T> {
 
             let stream = *(*self.ptr).streams.add(id);
             Some(AvBorrow::wrap(&self, AvStream::wrap(self.ptr, stream)))
+        }
+    }
+
+    pub fn stream_mut(&mut self, id: usize) -> Option<AvBorrowMut<Self, AvStream<T>>> {
+        unsafe {
+            if id >= self.nb_streams() {
+                return None;
+            }
+
+            let stream = *(*self.ptr).streams.add(id);
+            Some(AvBorrowMut::wrap(self, AvStream::wrap(self.ptr, stream)))
         }
     }
 

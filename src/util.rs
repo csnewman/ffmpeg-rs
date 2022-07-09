@@ -47,3 +47,23 @@ impl Into<AVRational> for AvRational {
         }
     }
 }
+
+macro_rules! property {
+    ($name:ident, $ret:ty) => {
+        paste::paste! {
+            pub fn $name(&self) -> $ret {
+                unsafe {
+                    (*self.ptr).$name
+                }
+            }
+
+            pub fn [<set_ $name>](&mut self, value: $ret) {
+                unsafe {
+                    (*self.ptr).$name = value;
+                }
+            }
+        }
+    };
+}
+
+pub(crate) use property;

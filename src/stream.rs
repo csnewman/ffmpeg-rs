@@ -1,6 +1,5 @@
 use crate::codec::AvCodecParameters;
 use crate::context::ContextType;
-use crate::format::AvFormatContext;
 use crate::frame::AvFrame;
 use crate::sys::{av_guess_frame_rate, AVFormatContext, AVStream};
 use crate::util::AvRational;

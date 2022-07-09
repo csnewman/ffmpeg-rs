@@ -1,10 +1,13 @@
 use crate::context::{ContextType, DecodeContext, EncodeContext};
+use crate::frame::AvFrame;
+use crate::packet::AvPacket;
 pub use crate::sys::AVCodecID as AvCodecId;
 pub use crate::sys::AVPixelFormat as AvPixelFormat;
 use crate::sys::{
     avcodec_alloc_context3, avcodec_find_decoder, avcodec_find_encoder, avcodec_open2,
     avcodec_parameters_alloc, avcodec_parameters_copy, avcodec_parameters_free,
-    avcodec_parameters_from_context, avcodec_parameters_to_context, AVCodec, AVCodecContext,
+    avcodec_parameters_from_context, avcodec_parameters_to_context, avcodec_receive_frame,
+    avcodec_receive_packet, avcodec_send_frame, avcodec_send_packet, AVCodec, AVCodecContext,
     AVCodecParameters, AV_CODEC_FLAG_4MV, AV_CODEC_FLAG_AC_PRED, AV_CODEC_FLAG_BITEXACT,
     AV_CODEC_FLAG_CLOSED_GOP, AV_CODEC_FLAG_DROPCHANGED, AV_CODEC_FLAG_GLOBAL_HEADER,
     AV_CODEC_FLAG_GRAY, AV_CODEC_FLAG_INTERLACED_DCT, AV_CODEC_FLAG_INTERLACED_ME,
@@ -12,13 +15,13 @@ use crate::sys::{
     AV_CODEC_FLAG_PASS1, AV_CODEC_FLAG_PASS2, AV_CODEC_FLAG_PSNR, AV_CODEC_FLAG_QPEL,
     AV_CODEC_FLAG_QSCALE, AV_CODEC_FLAG_TRUNCATED, AV_CODEC_FLAG_UNALIGNED,
 };
+use crate::util::property;
 use crate::util::AvRational;
 use crate::{wrap_error, AvError, AvMediaType, AvOwnable, AvOwned};
 use bitflags::bitflags;
-use paste::paste;
 use std::marker::PhantomData;
 use std::os::raw::{c_int, c_uint};
-use std::ptr;
+use std::{mem, ptr};
 
 bitflags! {
     pub struct CodecFlags: u32 {
@@ -42,24 +45,6 @@ bitflags! {
         const INTERLACED_ME = AV_CODEC_FLAG_INTERLACED_ME;
         const CLOSED_GOP = AV_CODEC_FLAG_CLOSED_GOP;
     }
-}
-
-macro_rules! property {
-    ($name:ident, $ret:ty) => {
-        paste! {
-            pub fn $name(&self) -> $ret {
-                unsafe {
-                    (*self.ptr).$name
-                }
-            }
-
-            pub fn [<set_ $name>](&mut self, value: $ret) {
-                unsafe {
-                    (*self.ptr).$name = value;
-                }
-            }
-        }
-    };
 }
 
 pub struct AvCodecParameters {
@@ -103,6 +88,16 @@ impl AvCodecParameters {
 
     pub fn sample_rate(&self) -> c_int {
         unsafe { (*self.params).sample_rate }
+    }
+
+    pub fn pix_fmt(&self) -> AvPixelFormat {
+        unsafe { mem::transmute((*self.params).format as i32) }
+    }
+
+    pub fn set_pix_fmt(&self, value: AvPixelFormat) {
+        unsafe {
+            (*self.params).format = value as i32;
+        }
     }
 
     pub fn copy_from(&mut self, src: &AvCodecParameters) -> Result<(), AvError> {
@@ -308,6 +303,55 @@ impl<T: ContextType> AvCodecContext<T> {
     pub fn set_flags(&mut self, value: CodecFlags) {
         unsafe {
             (*self.ptr).flags = value.bits as c_int;
+        }
+    }
+}
+
+impl AvCodecContext<DecodeContext> {
+    pub fn send_packet(&mut self, packet: &AvPacket) -> Result<(), AvError> {
+        unsafe {
+            let result = avcodec_send_packet(self.ptr, packet.ptr);
+            match result {
+                0 => Ok(()),
+                val => Err(wrap_error(val)),
+            }
+        }
+    }
+
+    pub fn receive_frame(&mut self, target: &AvFrame) -> Result<(), AvError> {
+        unsafe {
+            let result = avcodec_receive_frame(self.ptr, target.ptr);
+            match result {
+                0 => Ok(()),
+                val => Err(wrap_error(val)),
+            }
+        }
+    }
+}
+
+impl AvCodecContext<EncodeContext> {
+    pub fn send_frame(&mut self, frame: Option<&AvFrame>) -> Result<(), AvError> {
+        unsafe {
+            let frame = match frame {
+                None => ptr::null(),
+                Some(value) => value.ptr,
+            };
+
+            let result = avcodec_send_frame(self.ptr, frame);
+            match result {
+                0 => Ok(()),
+                val => Err(wrap_error(val)),
+            }
+        }
+    }
+
+    pub fn receive_packet(&mut self, target: &AvPacket) -> Result<(), AvError> {
+        unsafe {
+            let result = avcodec_receive_packet(self.ptr, target.ptr);
+            match result {
+                0 => Ok(()),
+                val => Err(wrap_error(val)),
+            }
         }
     }
 }
