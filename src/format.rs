@@ -5,13 +5,14 @@ use crate::packet::AvPacket;
 use crate::stream::AvStream;
 use crate::sys::{
     av_guess_format, av_interleaved_write_frame, av_read_frame, av_write_frame, av_write_trailer,
-    avformat_find_stream_info, avformat_init_output, avformat_new_stream, avformat_open_input,
-    avformat_write_header, AVDictionary, AVFormatContext, AVIOContext, AVOutputFormat,
-    AVFMT_ALLOW_FLUSH, AVFMT_GLOBALHEADER, AVFMT_NEEDNUMBER, AVFMT_NODIMENSIONS, AVFMT_NOFILE,
-    AVFMT_NOSTREAMS, AVFMT_NOTIMESTAMPS, AVFMT_TS_NEGATIVE, AVFMT_TS_NONSTRICT, AVFMT_VARIABLE_FPS,
+    avformat_alloc_output_context2, avformat_find_stream_info, avformat_init_output,
+    avformat_new_stream, avformat_open_input, avformat_write_header, AVDictionary, AVFormatContext,
+    AVIOContext, AVOutputFormat, AVFMT_ALLOW_FLUSH, AVFMT_GLOBALHEADER, AVFMT_NEEDNUMBER,
+    AVFMT_NODIMENSIONS, AVFMT_NOFILE, AVFMT_NOSTREAMS, AVFMT_NOTIMESTAMPS, AVFMT_TS_NEGATIVE,
+    AVFMT_TS_NONSTRICT, AVFMT_VARIABLE_FPS,
 };
 use crate::util::{cstr_optional_to_ptr, map_to_cstr_optional};
-use crate::{avformat_alloc_output_context2, wrap_error, AvBorrow, AvBorrowMut, AvError};
+use crate::{AvBorrow, AvBorrowMut, AvResult};
 use bitflags::bitflags;
 use std::marker::PhantomData;
 use std::ptr;
@@ -22,7 +23,7 @@ pub struct AvFormatContext<T: ContextType> {
 }
 
 impl AvFormatContext<InputContext> {
-    pub fn open_input(url: Option<&str>) -> Result<Self, AvError> {
+    pub fn open_input(url: Option<&str>) -> AvResult<Self> {
         unsafe {
             let mut ctx = ptr::null_mut();
             let url = map_to_cstr_optional(url);
@@ -39,12 +40,12 @@ impl AvFormatContext<InputContext> {
                     ptr: ctx,
                     _type: Default::default(),
                 }),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
 
-    pub fn find_stream_info(&self, options: Option<&[&AvDictionary]>) -> Result<(), AvError> {
+    pub fn find_stream_info(&self, options: Option<&[&AvDictionary]>) -> AvResult<()> {
         unsafe {
             let options: Option<Vec<*mut AVDictionary>> = match options {
                 None => None,
@@ -60,18 +61,18 @@ impl AvFormatContext<InputContext> {
 
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
 
-    pub fn read_frame(&mut self, dest: &mut AvPacket) -> Result<(), AvError> {
+    pub fn read_frame(&mut self, dest: &mut AvPacket) -> AvResult<()> {
         unsafe {
             let result = av_read_frame(self.ptr, dest.ptr);
 
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
@@ -88,7 +89,7 @@ impl AvFormatContext<OutputContext> {
         oformat: Option<&AvOutputFormat>,
         format_name: Option<&str>,
         filename: Option<&str>,
-    ) -> Result<Self, AvError> {
+    ) -> AvResult<Self> {
         unsafe {
             let mut ctx = ptr::null_mut();
             let oformat = match oformat {
@@ -110,12 +111,12 @@ impl AvFormatContext<OutputContext> {
                     ptr: ctx,
                     _type: Default::default(),
                 }),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
 
-    pub fn init_output(&mut self, options: Option<&mut AvDictionary>) -> Result<(), AvError> {
+    pub fn init_output(&mut self, options: Option<&mut AvDictionary>) -> AvResult<()> {
         unsafe {
             let options = match options {
                 None => ptr::null_mut(),
@@ -124,37 +125,37 @@ impl AvFormatContext<OutputContext> {
             let result = avformat_init_output(self.ptr, options);
 
             if result.is_negative() {
-                Err(wrap_error(result))
+                Err(result.into())
             } else {
                 Ok(())
             }
         }
     }
 
-    pub fn write_header(&mut self) -> Result<(), AvError> {
+    pub fn write_header(&mut self) -> AvResult<()> {
         unsafe {
             let result = avformat_write_header(self.ptr, ptr::null_mut());
 
             if result.is_negative() {
-                Err(wrap_error(result))
+                Err(result.into())
             } else {
                 Ok(())
             }
         }
     }
 
-    pub fn interleaved_write_frame(&self, packet: &AvPacket) -> Result<(), AvError> {
+    pub fn interleaved_write_frame(&self, packet: &AvPacket) -> AvResult<()> {
         unsafe {
             let result = av_interleaved_write_frame(self.ptr, packet.ptr);
 
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
 
-    pub fn write_frame(&self, packet: Option<&AvPacket>) -> Result<(), AvError> {
+    pub fn write_frame(&self, packet: Option<&AvPacket>) -> AvResult<()> {
         unsafe {
             let packet = match packet {
                 None => ptr::null_mut(),
@@ -164,20 +165,20 @@ impl AvFormatContext<OutputContext> {
             let result = av_write_frame(self.ptr, packet);
 
             if result.is_negative() {
-                Err(wrap_error(result))
+                Err(result.into())
             } else {
                 Ok(())
             }
         }
     }
 
-    pub fn write_trailer(&mut self) -> Result<(), AvError> {
+    pub fn write_trailer(&mut self) -> AvResult<()> {
         unsafe {
             let result = av_write_trailer(self.ptr);
 
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
@@ -210,13 +211,13 @@ impl<T: ContextType> AvFormatContext<T> {
         }
     }
 
-    pub fn new_stream(&mut self) -> Option<AvStream<T>> {
+    pub fn new_stream(&mut self) -> Option<AvBorrowMut<Self, AvStream<T>>> {
         unsafe {
             let stream = avformat_new_stream(self.ptr, ptr::null());
             if stream.is_null() {
                 None
             } else {
-                Some(AvStream::wrap(self.ptr, stream))
+                Some(AvBorrowMut::wrap(self, AvStream::wrap(self.ptr, stream)))
             }
         }
     }

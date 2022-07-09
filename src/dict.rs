@@ -3,7 +3,7 @@ use crate::sys::{
     AV_DICT_IGNORE_SUFFIX, AV_DICT_MATCH_CASE, AV_DICT_MULTIKEY,
 };
 use crate::util::map_to_cstr;
-use crate::{wrap_error, AvError, AvOwnable, AvOwned};
+use crate::{AvOwnable, AvOwned, AvResult};
 use bitflags::bitflags;
 use std::ptr;
 
@@ -35,7 +35,7 @@ impl AvDictionary {
         unsafe { av_dict_count(self.ptr) as usize }
     }
 
-    pub fn set(&mut self, key: &str, value: &str, flags: DictInsertFlags) -> Result<(), AvError> {
+    pub fn set(&mut self, key: &str, value: &str, flags: DictInsertFlags) -> AvResult<()> {
         unsafe {
             let key = map_to_cstr(key);
             let value = map_to_cstr(value);
@@ -48,7 +48,7 @@ impl AvDictionary {
 
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }

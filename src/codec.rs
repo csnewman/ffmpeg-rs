@@ -17,7 +17,7 @@ use crate::sys::{
 };
 use crate::util::property;
 use crate::util::AvRational;
-use crate::{wrap_error, AvError, AvMediaType, AvOwnable, AvOwned};
+use crate::{AvMediaType, AvOwnable, AvOwned, AvResult};
 use bitflags::bitflags;
 use std::marker::PhantomData;
 use std::os::raw::{c_int, c_uint};
@@ -100,27 +100,24 @@ impl AvCodecParameters {
         }
     }
 
-    pub fn copy_from(&mut self, src: &AvCodecParameters) -> Result<(), AvError> {
+    pub fn copy_from(&mut self, src: &AvCodecParameters) -> AvResult<()> {
         unsafe {
             let result = avcodec_parameters_copy(self.params, src.params);
 
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
 
-    pub fn copy_from_context<T: ContextType>(
-        &mut self,
-        src: &AvCodecContext<T>,
-    ) -> Result<(), AvError> {
+    pub fn copy_from_context<T: ContextType>(&mut self, src: &AvCodecContext<T>) -> AvResult<()> {
         unsafe {
             let result = avcodec_parameters_from_context(self.params, src.ptr);
 
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
@@ -218,18 +215,18 @@ impl<T: ContextType> AvCodecContext<T> {
         }
     }
 
-    pub fn use_parameters(&mut self, params: &AvCodecParameters) -> Result<(), AvError> {
+    pub fn use_parameters(&mut self, params: &AvCodecParameters) -> AvResult<()> {
         unsafe {
             let result = avcodec_parameters_to_context(self.ptr, params.params);
 
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
 
-    pub fn open(&mut self, codec: Option<&AvCodec<T>>) -> Result<(), AvError> {
+    pub fn open(&mut self, codec: Option<&AvCodec<T>>) -> AvResult<()> {
         unsafe {
             let codec = match codec {
                 None => ptr::null(),
@@ -239,7 +236,7 @@ impl<T: ContextType> AvCodecContext<T> {
             let result = avcodec_open2(self.ptr, codec, ptr::null_mut());
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
@@ -308,29 +305,29 @@ impl<T: ContextType> AvCodecContext<T> {
 }
 
 impl AvCodecContext<DecodeContext> {
-    pub fn send_packet(&mut self, packet: &AvPacket) -> Result<(), AvError> {
+    pub fn send_packet(&mut self, packet: &AvPacket) -> AvResult<()> {
         unsafe {
             let result = avcodec_send_packet(self.ptr, packet.ptr);
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
 
-    pub fn receive_frame(&mut self, target: &AvFrame) -> Result<(), AvError> {
+    pub fn receive_frame(&mut self, target: &AvFrame) -> AvResult<()> {
         unsafe {
             let result = avcodec_receive_frame(self.ptr, target.ptr);
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
 }
 
 impl AvCodecContext<EncodeContext> {
-    pub fn send_frame(&mut self, frame: Option<&AvFrame>) -> Result<(), AvError> {
+    pub fn send_frame(&mut self, frame: Option<&AvFrame>) -> AvResult<()> {
         unsafe {
             let frame = match frame {
                 None => ptr::null(),
@@ -340,17 +337,17 @@ impl AvCodecContext<EncodeContext> {
             let result = avcodec_send_frame(self.ptr, frame);
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }
 
-    pub fn receive_packet(&mut self, target: &AvPacket) -> Result<(), AvError> {
+    pub fn receive_packet(&mut self, target: &AvPacket) -> AvResult<()> {
         unsafe {
             let result = avcodec_receive_packet(self.ptr, target.ptr);
             match result {
                 0 => Ok(()),
-                val => Err(wrap_error(val)),
+                val => Err(val.into()),
             }
         }
     }

@@ -195,6 +195,7 @@ fn main() {
         .clang_args([format!("-I{}", prefix.join("include").to_string_lossy())])
         .parse_callbacks(Box::new(Callbacks))
         .rustified_enum("*")
+        .blocklist_item("AVERROR_.*")
         .generate()
         .expect("Unable to generate bindings")
         .to_string();
