@@ -11,6 +11,7 @@ pub mod frame;
 pub mod io;
 pub mod packet;
 pub mod stream;
+pub mod sws;
 mod sys;
 pub mod util;
 

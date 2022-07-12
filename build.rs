@@ -60,6 +60,7 @@ const ENABLED_HEADERS: &'static [&'static str] = &[
     "libavutil/error.h",
     "libavcodec/avcodec.h",
     "libavformat/avformat.h",
+    "libswscale/swscale.h",
 ];
 
 lazy_static! {
