@@ -13,7 +13,7 @@ use crate::sys::{
 };
 use crate::util::{cstr_optional_to_ptr, map_to_cstr_optional};
 use crate::{AvBorrow, AvBorrowMut, AvResult};
-use bitflags::bitflags;
+use bitflags::{bitflags, Flags};
 use std::marker::PhantomData;
 use std::ptr;
 
@@ -284,6 +284,6 @@ impl AvOutputFormat {
     }
 
     pub fn flags(&self) -> OutputFlags {
-        unsafe { OutputFlags::from_bits_unchecked((*self.ptr).flags as u32) }
+        unsafe { OutputFlags::from_bits_retain((*self.ptr).flags as u32) }
     }
 }

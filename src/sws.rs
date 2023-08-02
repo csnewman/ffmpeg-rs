@@ -6,7 +6,7 @@ use crate::sys::{
     SWS_X,
 };
 use crate::{sys, AvResult};
-use bitflags::bitflags;
+use bitflags::{bitflags, Flags};
 use std::os::raw::c_int;
 use std::ptr;
 
@@ -48,7 +48,7 @@ impl SwsContext {
                 dstW,
                 dstH,
                 dstFormat,
-                flags.bits as c_int,
+                flags.bits() as c_int,
                 ptr::null_mut(),
                 ptr::null_mut(),
                 ptr::null(),

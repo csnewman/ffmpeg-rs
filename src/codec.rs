@@ -18,7 +18,7 @@ use crate::sys::{
 use crate::util::property;
 use crate::util::AvRational;
 use crate::{AvMediaType, AvOwnable, AvOwned, AvResult};
-use bitflags::bitflags;
+use bitflags::{bitflags, Flags};
 use std::marker::PhantomData;
 use std::os::raw::{c_int, c_uint};
 use std::{mem, ptr};
@@ -293,12 +293,12 @@ impl<T: ContextType> AvCodecContext<T> {
     }
 
     pub fn flags(&self) -> CodecFlags {
-        unsafe { CodecFlags::from_bits_unchecked((*self.ptr).flags as u32) }
+        unsafe { CodecFlags::from_bits_retain((*self.ptr).flags as u32) }
     }
 
     pub fn set_flags(&mut self, value: CodecFlags) {
         unsafe {
-            (*self.ptr).flags = value.bits as c_int;
+            (*self.ptr).flags = value.bits() as c_int;
         }
     }
 }

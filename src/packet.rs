@@ -44,7 +44,7 @@ impl AvPacket {
     }
 
     pub fn flags(&self) -> PacketFlags {
-        unsafe { PacketFlags::from_bits_unchecked((*self.ptr).flags as u32) }
+        unsafe { PacketFlags::from_bits_retain((*self.ptr).flags as u32) }
     }
 
     pub fn duration(&self) -> i64 {

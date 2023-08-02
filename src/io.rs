@@ -4,7 +4,7 @@ use crate::sys::{
 };
 use crate::util::map_to_cstr;
 use crate::AvResult;
-use bitflags::bitflags;
+use bitflags::{bitflags, Flags};
 use std::os::raw::c_int;
 
 bitflags! {
@@ -26,7 +26,7 @@ impl AvIoContext {
             let ptr = self.ptr as *mut *mut AVIOContext;
             let url = map_to_cstr(url);
 
-            let result = avio_open(ptr, url.as_ptr(), flags.bits as c_int);
+            let result = avio_open(ptr, url.as_ptr(), flags.bits() as c_int);
 
             match result {
                 0 => Ok(()),

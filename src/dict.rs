@@ -4,7 +4,7 @@ use crate::sys::{
 };
 use crate::util::map_to_cstr;
 use crate::{AvOwnable, AvOwned, AvResult};
-use bitflags::bitflags;
+use bitflags::{bitflags, Flags};
 use std::ptr;
 
 bitflags! {
@@ -43,7 +43,7 @@ impl AvDictionary {
                 &mut self.ptr,
                 key.as_ptr(),
                 value.as_ptr(),
-                flags.bits as i32,
+                flags.bits() as i32,
             );
 
             match result {
