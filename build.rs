@@ -12,7 +12,7 @@ use std::process::{Command, Stdio};
 use tar::{Archive, Entry, EntryType};
 
 const DOWNLOAD_URL: &'static str =
-    "https://github.com/FFmpeg/FFmpeg/archive/refs/heads/release/5.0.tar.gz";
+    "https://github.com/FFmpeg/FFmpeg/archive/refs/heads/release/6.0.tar.gz";
 
 const ENABLED_LIBRARIES: &'static [&'static str] = &[
     // Core
@@ -53,6 +53,7 @@ const ENABLED_LIBRARIES: &'static [&'static str] = &[
     "libx265",
     "libxvid",
     "libdrm",
+    "libdav1d",
 ];
 
 const ENABLED_HEADERS: &'static [&'static str] = &[
@@ -211,7 +212,7 @@ fn build_ffmpeg() {
     std::fs::create_dir_all("cache").unwrap();
 
     // Download file
-    let src_archive = Path::new::<str>("cache/ffmpeg-5.0.tar.gz").to_path_buf();
+    let src_archive = Path::new::<str>("cache/ffmpeg-6.0.tar.gz").to_path_buf();
     if !src_archive.exists() {
         println!("Downloading {}", DOWNLOAD_URL);
         let resp = reqwest::blocking::get(DOWNLOAD_URL).expect("Failed to fetch");
@@ -243,6 +244,7 @@ fn build_ffmpeg() {
     {
         let mut cmd = Command::new("make");
         cmd.current_dir(&build_dir);
+        cmd.arg("-j").arg(num_cpus::get().to_string());
         println!("Running {:?}", cmd);
 
         let output = cmd
